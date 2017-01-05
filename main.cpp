@@ -23,9 +23,9 @@ void resolve_arg(int argc, char *argv[]){
         } else if (action == "-c") { // Vypíše čísla clusterů, oddělené dvojtečkou, obsahující data souboru s1 (s1 je plná cesta ve virtuální FAT)
             fat1.print_file_clusters(string(argv[3]));
         } else if (action == "-m") { // Vytvoří nový adresář ADR v cestě ADR2
-
+            fat1.create_new_directory(string(argv[3]), string(argv[4]));
         } else if (action == "-r") { // Smaže prázdný adresář ADR (ADR je plná cesta ve virtuální FAT)
-
+            fat1.delete_directory(string(argv[3]));
         } else if (action == "-l") { // Vypíše obsah souboru s1 na obrazovku (s1 je plná cesta ve virtuální FAT)
             fat1.get_file_content(string(argv[3]));
         } else if (action == "-p") { // Vypíše obsah adresáře ve formátu +adresář, +podadresář cluster, ukončeno --, - soubor první_cluster počet_clusterů. Jeden záznam jeden řádek. Podadresáře odsazeny o /t:

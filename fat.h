@@ -62,6 +62,10 @@ public:
 
     int32_t get_first_free_cluster();
 
+    void create_new_directory(std::string dir_name, std::string fat_path);
+
+    void delete_directory(std::string dir_path);
+
     std::vector<fat::directory> get_dir_children(int32_t dir_cluster);
 
     int32_t get_parent_cluster(std::vector<std::string> file_path);

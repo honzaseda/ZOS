@@ -60,11 +60,13 @@ public:
 
     void create_new_file(std::string file_path, std::string fat_path);
 
-    int32_t get_first_free_cluster();
-
     void create_new_directory(std::string dir_name, std::string fat_path);
 
     void delete_directory(std::string dir_path);
+
+    void delete_file(std::string file_path);
+
+    int32_t get_first_free_cluster();
 
     std::vector<fat::directory> get_dir_children(int32_t dir_cluster);
 
@@ -84,7 +86,7 @@ public:
 
     void print_directory(int iteration_level, int32_t curr_dir);
 
-    int fat_creator(FILE *fp);
+    void fat_creator(FILE *fp);
 };
 
 

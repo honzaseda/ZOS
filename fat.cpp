@@ -3,6 +3,7 @@
 //
 
 #include <stack>
+#include <cassert>
 #include "fat.h"
 
 fat::fat() {
@@ -10,7 +11,7 @@ fat::fat() {
 }
 
 fat::~fat() {
-
+    fclose(fs);
 }
 
 int fat::fat_loader(char *name) {
@@ -93,37 +94,77 @@ void fat::set_cluster_data(){
             cluster_data.push_back(cluster_content);
         }
     }
-    std::cout << &dir_info.at(1).dir << std::endl;
-    printf("%d\n", sizeof(int32_t) * fs_br->usable_cluster_count);
     free(cluster_content);
 }
 
 void fat::create_new_file(std::string file_path, std::string fat_path){
+    FILE *fnew;
     std::vector<std::string> result = explode(fat_path, '/');
+
     struct directory root;
-    memset(root.name, '\0', sizeof(root.name));
-    root.is_file = 1;
-    strcpy(root.name, file_path.c_str());
-    root.size = 127;
-    int32_t actual_cluster = get_first_free_cluster();
-    root.start_cluster = actual_cluster;
+    std::vector<std::string> split_content = std::vector<std::string>();
+    std::vector<int32_t> free_clusters = std::vector<int32_t>();
 
-    char cluster[fs_br->cluster_size];
-    memset(cluster, '\0', sizeof(cluster));
-    strcpy(cluster, "Ahoj, pohadka o karkulce, kterou musel milovat kazdy, jen ji uvidel, ale nejvice ji milovala jeji babicka, ktera by ji snesla.");
+    // ---
+    // Reading the input file and storing its content into a string vector
+    // ---
+    fnew = fopen(file_path.c_str(), "r");
+    fseek(fnew, 0, SEEK_END);
+    long fsize = ftell(fnew);
+    fseek(fnew, 0, SEEK_SET);
+    std::string content( fsize, '\0' );
+    fread(&content[0], fsize, 1, fnew);
+    fclose(fnew);
+    int NumSubstrings = content.length() / fs_br->cluster_size;
+    for (auto i = 0; i < NumSubstrings; i++)
+    {
+        split_content.push_back(content.substr(i * fs_br->cluster_size, fs_br->cluster_size));
+    }
+    if (content.length() % fs_br->cluster_size != 0)
+    {
+        split_content.push_back(content.substr(fs_br->cluster_size * NumSubstrings));
+    }
 
+    // ---
+    // Updating all FAT table copies
+    // ---
+    for(int i = 0; i < split_content.size(); i++){
+        free_clusters.push_back(get_first_free_cluster());
+    }
+    assert(free_clusters.size() == split_content.size());
     int32_t new_fat[fs_br->usable_cluster_count];
     for(int k = 0; k < fs_br->usable_cluster_count; k++){
         new_fat[k] = fat_table[k];
     }
-    new_fat[actual_cluster] = FAT_FILE_END;
-
+    for(int x = 0; x < free_clusters.size(); x++){
+        if(x != free_clusters.size()-1){
+            new_fat[free_clusters.at(x)] = free_clusters.at(x+1);
+        }
+        else{
+            new_fat[free_clusters.at(x)] = FAT_FILE_END;
+        }
+    }
     fseek(fs, sizeof(boot_record), SEEK_SET);
     for(int i = 0; i < fs_br->fat_copies; i++) {
         fwrite(&new_fat, sizeof(new_fat), 1, fs);
     }
 
-    std::vector<fat::directory> children = get_dir_children(0);
+    // ---
+    // Updating the parent directory content
+    // ---
+    memset(root.name, '\0', sizeof(root.name));
+    root.is_file = 1;
+    strcpy(root.name, file_path.c_str());
+    root.size = fsize;
+    root.start_cluster = free_clusters.at(0);
+
+    int32_t parent = get_parent_cluster(result);
+    if(parent < 0){
+        std::cout << "PATH NOT FOUND" << std::endl;
+        exit(1);
+    }
+    std::vector<fat::directory> children = get_dir_children(parent);
+    fseek(fs, parent * fs_br->cluster_size, SEEK_CUR);
     int16_t ac_size = 0;
     for(int j = 0; j < children.size(); j++){
         fwrite(&children.at(j), sizeof(directory), 1, fs);
@@ -135,14 +176,26 @@ void fat::create_new_file(std::string file_path, std::string fat_path){
     for (int16_t i = 0; i < (fs_br->cluster_size - ac_size); i++) {
         fwrite(buffer, sizeof(buffer), 1, fs);
     }
-    fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count)), SEEK_SET);
-    fseek(fs, fs_br->cluster_size * actual_cluster, SEEK_CUR);
-    fwrite(&cluster, sizeof(cluster), 1, fs);
+
+    // ---
+    // Inserting the input file content into FAT clusters
+    // ---
+    for(int i = 0; i < free_clusters.size(); i++) {
+        char cluster[fs_br->cluster_size];
+        memset(cluster, '\0', sizeof(cluster));
+        strcpy(cluster, split_content.at(i).c_str());
+
+        fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count)),
+              SEEK_SET);
+        fseek(fs, fs_br->cluster_size * free_clusters.at(i), SEEK_CUR);
+        fwrite(&cluster, sizeof(cluster), 1, fs);
+    }
 }
 
 int32_t fat::get_first_free_cluster(){
     for(int i = 0; i < fs_br->usable_cluster_count; i++){
         if(fat_table[i] == FAT_UNUSED){
+            fat_table[i] = FAT_FILE_END;
             return i;
         }
     }
@@ -160,7 +213,26 @@ std::vector<fat::directory> fat::get_dir_children(int32_t dir_cluster){
 }
 
 int32_t fat::get_parent_cluster(std::vector<std::string> file_path){
+    std::stack<int32_t> last_parent;
+    last_parent.push(0);
+    for (int i = 0; i < file_path.size(); i++) {
+        for (int j = 0; j < dir_info.size(); j++) {
+            if (strcmp(dir_info.at(j).dir->name, file_path[i].c_str()) == 0) {
+                if ((!dir_info.at(j).dir->is_file) && (i == (file_path.size() - 1))) {
+                    if (dir_info.at(j).parent_dir == last_parent.top()) {
+                        return dir_info.at(j).dir->start_cluster;
+                    }
+                } else {
+                    if (last_parent.top() == dir_info.at(j).parent_dir) {
+                        last_parent.push(dir_info.at(j).dir->start_cluster);
+                        break;
+                    }
+                }
+            }
+        }
 
+    }
+    return -1;
 }
 
 void fat::print_file_clusters(std::string file_path) {

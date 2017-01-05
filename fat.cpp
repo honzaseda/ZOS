@@ -4,12 +4,12 @@
 
 #include "fat.h"
 
-fat::fat(){
+fat::fat() {
 
 }
 
 fat::~fat() {
-    
+
 }
 
 int fat::fat_loader(char *name) {
@@ -90,33 +90,32 @@ int fat::fat_loader(char *name) {
     return 0;
 }
 
-void fat::print_file_clusters(std::string file_path){
+void fat::print_file_clusters(std::string file_path) {
     std::vector<std::string> result = explode(file_path, '/');
     int32_t found_file = get_file_start(result);
-    if(found_file != 0){
+    if (found_file != 0) {
         std::cout << file_path << ": " << found_file;
         int32_t curr_cluster = found_file;
-        while(fat_table[curr_cluster] != FAT_FILE_END){
+        while (fat_table[curr_cluster] != FAT_FILE_END) {
             std::cout << ", " << fat_table[curr_cluster];
             curr_cluster = fat_table[curr_cluster];
         }
-    }
-    else {
+    } else {
         std::cout << "PATH NOT FOUND" << std::endl;
     }
 }
 
 void fat::get_cluster_content(int32_t cluster) {
-    int32_t clust_pos = (sizeof(boot_record) + (2*sizeof(*fat_table)*fs_br->usable_cluster_count) + (cluster * fs_br->cluster_size));
+    int32_t clust_pos = (sizeof(boot_record) + (2 * sizeof(*fat_table) * fs_br->usable_cluster_count) +
+                         (cluster * fs_br->cluster_size));
     fseek(fs, clust_pos, SEEK_SET);
     char *cluster_content = (char *) malloc(fs_br->cluster_size * sizeof(char) + sizeof(char));
     memset(cluster_content, '\0', fs_br->cluster_size + 1);
     fread(cluster_content, (size_t) fs_br->cluster_size, 1, fs);
     //pokud je prazdny (tedy zacina 0, tak nevypisuj obsah)
-    if(fat_table[cluster] == FAT_FILE_END){
+    if (fat_table[cluster] == FAT_FILE_END) {
         std::cout << cluster_content << std::endl;
-    }
-    else{
+    } else {
         std::cout << cluster_content;
         get_cluster_content(fat_table[cluster]);
     }
@@ -126,27 +125,25 @@ void fat::get_cluster_content(int32_t cluster) {
 void fat::get_file_content(std::string file_path) {
     std::vector<std::string> result = explode(file_path, '/');
     int32_t found_file = get_file_start(result);
-    if(found_file != 0){
+    if (found_file != 0) {
         std::cout << file_path << ": ";
         get_cluster_content(found_file);
-    }
-    else {
+    } else {
         std::cout << "PATH NOT FOUND" << std::endl;
     }
 }
 
 int32_t fat::get_file_start(std::vector<std::string> file_path) {
     int32_t last_parent = 0;
-    for(int i = 0; i < file_path.size(); i++) {
+    for (int i = 0; i < file_path.size(); i++) {
         for (int j = 0; j < dir_info.size(); j++) {
             if (strcmp(dir_info.at(j).dir->name, file_path[i].c_str()) == 0) {
-                if((dir_info.at(j).dir->is_file) && (i == (file_path.size() - 1))) {
-                    if(dir_info.at(j).parent_dir == last_parent) {
+                if ((dir_info.at(j).dir->is_file) && (i == (file_path.size() - 1))) {
+                    if (dir_info.at(j).parent_dir == last_parent) {
                         return dir_info.at(j).dir->start_cluster;
                     }
-                }
-                else {
-                    if(last_parent == dir_info.at(j).parent_dir){
+                } else {
+                    if (last_parent == dir_info.at(j).parent_dir) {
                         last_parent = dir_info.at(j).dir->start_cluster;
                         break;
                     }
@@ -158,8 +155,7 @@ int32_t fat::get_file_start(std::vector<std::string> file_path) {
 }
 
 
-
-std::vector<std::string> fat::explode(const std::string& str, const char& ch) {
+std::vector<std::string> fat::explode(const std::string &str, const char &ch) {
     std::string next;
     std::vector<std::string> result;
 
@@ -183,48 +179,56 @@ std::vector<std::string> fat::explode(const std::string& str, const char& ch) {
     return result;
 }
 
-void fat::print_tree(){
+void fat::print_tree() {
     bool rootEmpty = true;
-    for(int i = 0; i < dir_info.size(); i++){
-        if(dir_info.at(i).parent_dir == 0){
+    for (int i = 0; i < dir_info.size(); i++) {
+        if (dir_info.at(i).parent_dir == 0) {
             rootEmpty = false;
             break;
         }
     }
-    if(!rootEmpty) {
+    if (!rootEmpty) {
         std::cout << "+ROOT" << std::endl;
         print_directory(1, 0);
         std::cout << "--" << std::endl;
-    }
-    else{
+    } else {
         std::cout << "EMPTY" << std::endl;
     }
 }
 
 void fat::print_directory(int iteration_level, int32_t curr_dir) {
     std::string indent = "";
-    for(int i = 0; i < iteration_level; i++){
+    for (int i = 0; i < iteration_level; i++) {
         indent.append("\t");
     }
-    for(int j = 0; j < dir_info.size(); j++){
-        if(dir_info.at(j).parent_dir == curr_dir){
-            if(dir_info.at(j).dir->is_file){
-                std::cout << indent << "-" << dir_info.at(j).dir->name << " " << dir_info.at(j).dir->start_cluster << std::endl;
-            }
-            else {
+    for (int j = 0; j < dir_info.size(); j++) {
+        if (dir_info.at(j).parent_dir == curr_dir) {
+            if (dir_info.at(j).dir->is_file) {
+
+                std::cout << indent << "-" << dir_info.at(j).dir->name << " " << dir_info.at(j).dir->start_cluster
+                          << " " << get_cluster_count(dir_info.at(j).dir->start_cluster)
+                          << std::endl;
+            } else {
                 std::cout << indent << "+" << dir_info.at(j).dir->name << std::endl;
                 print_directory(iteration_level + 1, dir_info.at(j).dir->start_cluster);
                 std::cout << indent << "--" << std::endl;
             }
         }
     }
+}
 
-
+int32_t fat::get_cluster_count(int32_t fat_start) {
+    int32_t count = 1;
+    while (fat_table[fat_start] != FAT_FILE_END) {
+        count++;
+        fat_start = fat_table[fat_start];
+    }
+    return count;
 }
 
 int fat::fat_creator(FILE *fp) {
     struct boot_record br;
-    struct directory root_a, root_b, root_c, root_d, root_e;
+    struct directory root_a, root_b, root_c, root_d, root_e, root_f, root_g;
 
     memset(br.volume_descriptor, '\0', sizeof(br.volume_descriptor));
     memset(br.signature, '\0', sizeof(br.signature));
@@ -261,11 +265,23 @@ int fat::fat_creator(FILE *fp) {
     root_d.size = 0;
     root_d.start_cluster = 29;
 
-    memset(root_e.name, '\0', sizeof(root_d.name));
-    root_d.is_file = 0;
+    memset(root_e.name, '\0', sizeof(root_e.name));
+    root_e.is_file = 0;
     strcpy(root_e.name, "podslozka");
     root_e.size = 0;
     root_e.start_cluster = 34;
+
+    memset(root_f.name, '\0', sizeof(root_f.name));
+    root_f.is_file = 1;
+    strcpy(root_f.name, "cisla.txt");
+    root_f.size = 139;
+    root_f.start_cluster = 35;
+
+    memset(root_g.name, '\0', sizeof(root_g.name));
+    root_g.is_file = 0;
+    strcpy(root_g.name, "cosituje");
+    root_g.size = 0;
+    root_g.start_cluster = 36;
 
     // pro zapis budu potrebovat i prazdny cluster
     char cluster_empty[br.cluster_size];
@@ -300,6 +316,7 @@ int fat::fat_creator(FILE *fp) {
     char cluster_b24[br.cluster_size];
     char cluster_c1[br.cluster_size];
     char cluster_c2[br.cluster_size];
+    char cluster_f1[br.cluster_size];
 
     //pripravim si obsah - delka stringu musi byt stejna jako velikost clusteru
     memset(cluster_empty, '\0', sizeof(cluster_empty));
@@ -330,7 +347,9 @@ int fat::fat_creator(FILE *fp) {
     memset(cluster_b24, '\0', sizeof(cluster_b24));
     memset(cluster_c1, '\0', sizeof(cluster_c1));
     memset(cluster_c2, '\0', sizeof(cluster_c2));
+    memset(cluster_f1, '\0', sizeof(cluster_f1));
     memset(cluster_dir1, '\0', sizeof(cluster_dir1));
+    memset(cluster_slozka, '\0', sizeof(cluster_slozka));
     memset(cluster_slozka, '\0', sizeof(cluster_slozka));
     strcpy(cluster_a,
            "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789 - tohle je malicky soubor pro test");
@@ -386,6 +405,8 @@ int fat::fat_creator(FILE *fp) {
            "Prodej aktiv SABMilleru v Ceske republice, Polsku, Ma?rsku, Rumunsku a na Slovensku je soucasti podminek pro prevzeti podniku ze strany americkeho pivovaru Anheuser-Busch InBev, ktere bylo dokonceno v rijnu. Krome Plze?keho Prazdroje zahrnuji prodavana ");
     strcpy(cluster_c2,
            "aktiva polske znacky Tyskie a Lech, slovensky Topvar, ma?rsky Dreher a rumunsky Ursus. - Tento soubor je sice kratky, ale neni fragmentovany");
+    strcpy(cluster_f1,
+           "moje0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789 - tohle je malicky soubor pro test");
 
 /////////// ZACATEK VYTVARENI FAT TABULKY
 
@@ -435,8 +456,10 @@ int fat::fat_creator(FILE *fp) {
     fat[33] = FAT_FILE_END;
     //podslozka
     fat[34] = FAT_DIRECTORY;
+    fat[35] = FAT_FILE_END;
+    fat[36] = FAT_DIRECTORY;
     //zbytek bude prazdny
-    for (int32_t i = 35; i < br.usable_cluster_count; i++) {
+    for (int32_t i = 37; i < br.usable_cluster_count; i++) {
         fat[i] = FAT_UNUSED;
     }
 
@@ -507,9 +530,19 @@ int fat::fat_creator(FILE *fp) {
     //druha cast msg.txt
     fwrite(&cluster_c2, sizeof(cluster_c2), 1, fp);
     //prazdna slozka
+    ac_size = 0;
+    fwrite(&root_f, sizeof(root_f), 1, fp);
+    ac_size += sizeof(root_f);
+    fwrite(&root_g, sizeof(root_g), 1, fp);
+    ac_size += sizeof(root_g);
+    for (int16_t i = 0; i < (cl_size - ac_size); i++)
+        fwrite(buffer, sizeof(buffer), 1, fp);
+    ac_size += sizeof(root_a);
+
+    fwrite(&cluster_f1, sizeof(cluster_f1), 1, fp);
     fwrite(&cluster_empty, sizeof(cluster_empty), 1, fp);
     //zbytek disku budou 0
-    for (long i = 34; i < br.usable_cluster_count; i++) {
+    for (long i = 37; i < br.usable_cluster_count; i++) {
         fwrite(&cluster_empty, sizeof(cluster_empty), 1, fp);
     }
     fclose(fp);

@@ -16,14 +16,13 @@
 
 class fat {
 public:
-
-
     const int32_t FAT_UNUSED = INT32_MAX - 1; //2147483646
     const int32_t FAT_FILE_END = INT32_MAX - 2; //2147483645
     const int32_t FAT_BAD_CLUSTER = INT32_MAX - 3; //2147483644
     const int32_t FAT_DIRECTORY = INT32_MAX - 4; //2147483643
 
     fat();
+
     ~fat();
 
     struct boot_record {
@@ -60,9 +59,11 @@ public:
 
     void get_file_content(std::string filepath);
 
-    std::vector<std::string> explode(const std::string& str, const char& ch);
+    std::vector<std::string> explode(const std::string &str, const char &ch);
 
     int32_t get_file_start(std::vector<std::string> file_path);
+
+    int32_t get_cluster_count(int32_t fat_start);
 
     void print_tree();
 

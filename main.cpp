@@ -17,7 +17,7 @@ void resolve_arg(int argc, char *argv[]){
 //        fat1.fat_creator(fsnew );
         fat1.fat_loader(fileName);
         if (action == "-a") {        // Nahraje soubor z adresáře do cesty virtuální FAT tabulky
-
+            fat1.create_new_file(string(argv[3]), string(argv[4]));
         } else if (action == "-f") { // Smaže soubor s1 z vaseFAT.dat (s1 je plná cesta ve virtuální FAT)
 
         } else if (action == "-c") { // Vypíše čísla clusterů, oddělené dvojtečkou, obsahující data souboru s1 (s1 je plná cesta ve virtuální FAT)

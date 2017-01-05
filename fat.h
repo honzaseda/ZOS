@@ -48,12 +48,23 @@ public:
 
     FILE *fs;
     std::vector<directory_info> dir_info = std::vector<directory_info>();
+    std::vector<std::string> cluster_data = std::vector<std::string>();
     struct boot_record *fs_br;
     int32_t *fat_table;
 
     int fat_loader(char *name);
 
+    void set_cluster_data();
+
     void print_file_clusters(std::string file_path);
+
+    void create_new_file(std::string file_path, std::string fat_path);
+
+    int32_t get_first_free_cluster();
+
+    std::vector<fat::directory> get_dir_children(int32_t dir_cluster);
+
+    int32_t get_parent_cluster(std::vector<std::string> file_path);
 
     void get_cluster_content(int32_t cluster);
 

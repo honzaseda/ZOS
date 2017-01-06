@@ -13,6 +13,7 @@
 #include <cmath>
 #include <vector>
 #include <string.h>
+#include <array>
 
 class fat {
 public:
@@ -85,6 +86,8 @@ public:
     void print_tree();
 
     void print_directory(int iteration_level, int32_t curr_dir);
+
+    void print_info();
 
     void fat_creator(FILE *fp);
 };

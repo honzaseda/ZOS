@@ -34,34 +34,12 @@ int fat::fat_loader(char *name) {
     }
     fseek(fs, SEEK_SET, 0);
     fread(fs_br, sizeof(struct boot_record), 1, fs);
-    /*
-    std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << "BOOT RECORD" << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << "volume_descriptor: " << fs_br->volume_descriptor << std::endl;
-//    std::cout << "fat_type: " << fs_br->fat_type << std::endl;
-    printf("fat_type: %d\n", fs_br->fat_type);
-    printf("fat_copies: %d\n", fs_br->fat_copies);
-//    std::cout << "fat_copies: " << fs_br->fat_copies << std::endl;
-    std::cout << "cluster_size: " << fs_br->cluster_size << std::endl;
-    std::cout << "usable_cluster_count: " << fs_br->usable_cluster_count << std::endl;
-    std::cout << "signature: " << fs_br->signature << std::endl;
 
-    std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << "FAT table" << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
-    */
     fat_table = (int32_t *) malloc(sizeof(int32_t) * fs_br->usable_cluster_count);
     for (int l = 0; l < fs_br->fat_copies; l++) {
         fread(fat_table, sizeof(*fat_table) * fs_br->usable_cluster_count, 1, fs);
     }
-/*
-    for (int asdf = 0; asdf < fs_br->usable_cluster_count; asdf++) {
-        if (fat_table[asdf] != FAT_UNUSED) {
-            printf("[%d] %d\n", asdf, fat_table[asdf]);
-        }
-    }
-    */
+    //print_info();
     set_cluster_data();
     return 0;
 }
@@ -401,7 +379,7 @@ void fat::delete_file(std::string file_path) {
 
     int32_t file_start = get_file_start(result);
 
-    if (file_start < 0) {
+    if (file_start <= 0) {
         std::cout << "PATH NOT FOUND" << std::endl;
         exit(1);
     }
@@ -463,6 +441,7 @@ void fat::delete_file(std::string file_path) {
 
     std::cout << "OK" << std::endl;
 }
+
 /**
  * Prints out numbers of all the clusters that the file is stored on
  * @param file_path Complete path to the file in the FAT file system
@@ -625,6 +604,30 @@ int32_t fat::get_cluster_count(int32_t fat_start) {
         fat_start = fat_table[fat_start];
     }
     return count;
+}
+
+/**
+ * Prints out FAT Boot record and FAT table content (does not print empty clusters)
+ */
+void fat::print_info(){
+    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "BOOT RECORD" << std::endl;
+    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "volume_descriptor: " << fs_br->volume_descriptor << std::endl;
+    printf("fat_type: %d\n", fs_br->fat_type);
+    printf("fat_copies: %d\n", fs_br->fat_copies);
+    std::cout << "cluster_size: " << fs_br->cluster_size << std::endl;
+    std::cout << "usable_cluster_count: " << fs_br->usable_cluster_count << std::endl;
+    std::cout << "signature: " << fs_br->signature << std::endl;
+
+    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "FAT table" << std::endl;
+    std::cout << "--------------------------------------------------------" << std::endl;
+    for (int asdf = 0; asdf < fs_br->usable_cluster_count; asdf++) {
+        if (fat_table[asdf] != FAT_UNUSED) {
+            printf("[%d] %d\n", asdf, fat_table[asdf]);
+        }
+    }
 }
 
 /**

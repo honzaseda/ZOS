@@ -23,11 +23,10 @@ int fat::fat_loader(char *name) {
     fs_br = (struct boot_record *) malloc(sizeof(struct boot_record));
 
     if ((fs = fopen(name, "r+")) == NULL) {
-        if((fs = fopen(name, "w+")) != NULL){
+        if ((fs = fopen(name, "w+")) != NULL) {
             fat_creator(fs);
             fs = fopen(name, "r+");
-        }
-        else{
+        } else {
             exit(1);
         }
 
@@ -45,7 +44,7 @@ int fat::fat_loader(char *name) {
 }
 
 /**
- * Stores FAT data (file information, cluster content) into an appropriate vectors
+ * Stores FAT data (file information, cluster content) into appropriate vectors
  */
 void fat::set_cluster_data() {
     int32_t clust_pos = (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count));
@@ -414,7 +413,7 @@ void fat::delete_file(std::string file_path) {
 
     int32_t curr_cluster = file_start;
     std::vector<int32_t> clusters = std::vector<int32_t>();
-    while(new_fat[curr_cluster] != FAT_FILE_END){
+    while (new_fat[curr_cluster] != FAT_FILE_END) {
         int32_t tmp = new_fat[curr_cluster];
         new_fat[curr_cluster] = FAT_UNUSED;
         curr_cluster = tmp;
@@ -433,7 +432,7 @@ void fat::delete_file(std::string file_path) {
     // ---
     char cluster_empty[fs_br->cluster_size];
     memset(cluster_empty, '\0', sizeof(cluster_empty));
-    for(int i = 0; i < clusters.size(); i++) {
+    for (int i = 0; i < clusters.size(); i++) {
         fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
                    clusters.at(i) * fs_br->cluster_size), SEEK_SET);
         fwrite(&cluster_empty, sizeof(cluster_empty), 1, fs);
@@ -606,10 +605,140 @@ int32_t fat::get_cluster_count(int32_t fat_start) {
     return count;
 }
 
+void fat::defragment() {
+    std::vector<new_records> new_rec = std::vector<new_records>();
+    int32_t new_fat[fs_br->usable_cluster_count];
+    new_records temp;
+
+    print_info();
+
+    int32_t fat_pos = 1;
+    for (int i = 0; i < dir_info.size(); i++) {
+        std::vector<int32_t> clusters = get_file_clusters(dir_info.at(i).dir->start_cluster);
+        if (dir_info.at(i).dir->is_file) {
+            std::cout << dir_info.at(i).dir->name << std::endl;
+            std::cout << "\tclusters before: " << clusters.at(0);
+            for (int k = 1; k < clusters.size(); k++) {
+                std::cout << ", " << clusters.at(k);
+            }
+            std::cout << std::endl << "\tclusters after:  ";
+            for (int j = 0; j < clusters.size() - 1; j++) {
+                temp.actual_cluster = fat_pos;
+                temp.actual_child = fat_pos + 1;
+                temp.orig_cluster = clusters.at(j);
+                new_rec.push_back(temp);
+                std::cout << fat_pos << ", ";
+                fat_pos++;
+            }
+            std::cout << fat_pos << std::endl;
+            temp.actual_cluster = fat_pos;
+            temp.actual_child = FAT_FILE_END;
+            temp.orig_cluster = clusters.at(clusters.size() - 1);
+            new_rec.push_back(temp);
+            fat_pos++;
+        } else {
+            std::cout << dir_info.at(i).dir->name << std::endl;
+            std::cout << "\tclusters before: " << clusters.at(0) << std::endl;
+            temp.actual_cluster = fat_pos;
+            temp.actual_child = FAT_DIRECTORY;
+            temp.orig_cluster = clusters.at(0);
+            new_rec.push_back(temp);
+            std::cout << "\tclusters after:  " << fat_pos << std::endl;
+            fat_pos++;
+        }
+    }
+    new_fat[0] = FAT_DIRECTORY;
+    for (int i = 0; i < new_rec.size(); i++) {
+        new_fat[new_rec.at(i).actual_cluster] = new_rec.at(i).actual_child;
+    }
+    for (int i = new_rec.size() + 1; i < fs_br->usable_cluster_count; i++) {
+        new_fat[i] = FAT_UNUSED;
+    }
+    fseek(fs, sizeof(boot_record), SEEK_SET);
+    for (int i = 0; i < fs_br->fat_copies; i++) {
+        fwrite(&new_fat, sizeof(new_fat), 1, fs);
+    }
+
+    for (int i = 0; i < fs_br->usable_cluster_count; i++) {
+        int32_t orig = get_orig_cluster(new_rec, i);
+        if (new_fat[i] == FAT_DIRECTORY) {
+            std::vector<fat::directory> dir_children = get_dir_children(orig);
+            for (int j = 0; j < dir_children.size(); j++) {
+                dir_children.at(j).start_cluster = get_new_cluster(new_rec, dir_children.at(j).start_cluster);
+            }
+            int16_t ac_size = 0;
+            fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
+                       i * fs_br->cluster_size), SEEK_SET);
+            for (int j = 0; j < dir_children.size(); j++) {
+                fwrite(&dir_children.at(j), sizeof(fat::directory), 1, fs);
+                ac_size += sizeof(fat::directory);
+            }
+            char buffer[] = {'\0'};
+            for (int16_t j = 0; j < (fs_br->cluster_size - ac_size); j++) {
+                fwrite(buffer, sizeof(buffer), 1, fs);
+            }
+        } else {
+            if ((i != orig) && (new_fat[i] != FAT_UNUSED)) {
+                char cluster[fs_br->cluster_size];
+                memset(cluster, '\0', sizeof(cluster));
+                strcpy(cluster, cluster_data.at(orig).c_str());
+                fseek(fs,
+                      (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) + (fs_br->cluster_size * i)),
+                      SEEK_SET);
+                fwrite(&cluster, sizeof(cluster), 1, fs);
+            } else if (new_fat[i] == FAT_UNUSED) {
+                if (fat_table[i] != FAT_UNUSED) {
+                    char cluster_empty[fs_br->cluster_size];
+                    memset(cluster_empty, '\0', sizeof(cluster_empty));
+                    fseek(fs,
+                          (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) + (fs_br->cluster_size * i)),
+                          SEEK_SET);
+                    fwrite(&cluster_empty, sizeof(cluster_empty), 1, fs);
+                }
+            }
+        }
+    }
+}
+
+int32_t fat::get_orig_cluster(std::vector<new_records> rec, int32_t actual_cluster) {
+    for (int i = 0; i < rec.size(); i++) {
+        if (rec.at(i).actual_cluster == actual_cluster) {
+            return rec.at(i).orig_cluster;
+        }
+    }
+}
+
+int32_t fat::get_new_cluster(std::vector<new_records> rec, int32_t new_cluster) {
+    for (int i = 0; i < rec.size(); i++) {
+        if (rec.at(i).orig_cluster == new_cluster) {
+            return rec.at(i).actual_cluster;
+        }
+    }
+}
+
+std::vector<int32_t> fat::get_file_clusters(int32_t cluster) {
+    std::vector<int32_t> clusters = std::vector<int32_t>();
+    if ((fat_table[cluster] == FAT_DIRECTORY) || (fat_table[cluster] == FAT_FILE_END)) {
+        clusters.push_back(cluster);
+    } else {
+        int32_t curr_cluster = cluster;
+        clusters.push_back(curr_cluster);
+        while (fat_table[curr_cluster] != FAT_FILE_END) {
+            clusters.push_back(fat_table[curr_cluster]);
+            curr_cluster = fat_table[curr_cluster];
+        }
+    }
+    return clusters;
+}
+
+//void fat::remove_from_overwritten(int32_t cluster, std::deque<new_records> overwritten){
+
+//}
+
 /**
  * Prints out FAT Boot record and FAT table content (does not print empty clusters)
  */
-void fat::print_info(){
+void fat::print_info() {
     std::cout << "--------------------------------------------------------" << std::endl;
     std::cout << "BOOT RECORD" << std::endl;
     std::cout << "--------------------------------------------------------" << std::endl;
@@ -623,10 +752,10 @@ void fat::print_info(){
     std::cout << "--------------------------------------------------------" << std::endl;
     std::cout << "FAT table" << std::endl;
     std::cout << "--------------------------------------------------------" << std::endl;
-    for (int asdf = 0; asdf < fs_br->usable_cluster_count; asdf++) {
-        if (fat_table[asdf] != FAT_UNUSED) {
-            printf("[%d] %d\n", asdf, fat_table[asdf]);
-        }
+    for (int i = 0; i < fs_br->usable_cluster_count; i++) {
+        //if (fat_table[i] != FAT_UNUSED) {
+        printf("[%d] %d\n", i, fat_table[i]);
+        //}
     }
 }
 

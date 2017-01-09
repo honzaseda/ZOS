@@ -47,6 +47,12 @@ public:
         int32_t parent_dir;
     };
 
+    struct new_records {
+        int32_t actual_cluster;
+        int32_t actual_child;
+        int32_t orig_cluster;
+    };
+
     FILE *fs;
     std::vector<directory_info> dir_info = std::vector<directory_info>();
     std::vector<std::string> cluster_data = std::vector<std::string>();
@@ -55,17 +61,24 @@ public:
 
     int fat_loader(char *name);
 
-    void set_cluster_data();
+    void create_new_file(std::string file_path, std::string fat_path);
+
+    void delete_file(std::string file_path);
 
     void print_file_clusters(std::string file_path);
-
-    void create_new_file(std::string file_path, std::string fat_path);
 
     void create_new_directory(std::string dir_name, std::string fat_path);
 
     void delete_directory(std::string dir_path);
 
-    void delete_file(std::string file_path);
+    void get_file_content(std::string filepath);
+
+    void print_tree();
+
+    void defragment();
+
+private:
+    void set_cluster_data();
 
     int32_t get_first_free_cluster();
 
@@ -75,17 +88,21 @@ public:
 
     void get_cluster_content(int32_t cluster);
 
-    void get_file_content(std::string filepath);
-
     std::vector<std::string> explode(const std::string &str, const char &ch);
 
     int32_t get_file_start(std::vector<std::string> file_path);
 
     int32_t get_cluster_count(int32_t fat_start);
 
-    void print_tree();
-
     void print_directory(int iteration_level, int32_t curr_dir);
+
+    std::vector<int32_t> get_file_clusters(int32_t cluster);
+
+    //void remove_from_overwritten(int32_t cluster, std::deque<new_records> overwritten);
+
+    int32_t get_orig_cluster(std::vector<new_records> rec, int32_t actual_cluster);
+
+    int32_t get_new_cluster(std::vector<new_records> rec, int32_t new_cluster);
 
     void print_info();
 

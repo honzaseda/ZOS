@@ -62,7 +62,7 @@ void resolve_arg(int argc, char *argv[]) {
             }
         } else if (action == "-g") { // defragmentace
             if (argc == 3) {
-
+                fat1.defragment();
             } else {
                 std::cout << "WRONG NUMBER OF ARGUMENTS FOR ACTION '" << action << "', EXPECTED 2" << std::endl;
             }

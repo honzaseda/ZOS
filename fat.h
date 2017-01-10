@@ -17,10 +17,9 @@
 
 class fat {
 public:
-    const int8_t NEW_FAT_TYPE = 8;
+    const int8_t NEW_FAT_TYPE = 12;
     const int8_t NEW_FAT_COPIES = 2;
-    const int16_t NEW_CLUSTER_SIZE = 256; //Bytes
-    const int32_t NEW_USABLE_CLUSTER_COUNT = 251;
+    const int16_t NEW_CLUSTER_SIZE = 512; //Bytes
 
     const int32_t FAT_UNUSED = INT32_MAX - 1; //2147483646
     const int32_t FAT_FILE_END = INT32_MAX - 2; //2147483645

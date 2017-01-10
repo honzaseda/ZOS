@@ -38,6 +38,7 @@ int fat::fat_loader(char *name) {
     for (int l = 0; l < fs_br->fat_copies; l++) {
         fread(fat_table, sizeof(*fat_table) * fs_br->usable_cluster_count, 1, fs);
     }
+
     //print_info();
     set_cluster_data();
     return 0;
@@ -792,7 +793,7 @@ void fat::fat_creator(FILE *fp) {
     br.fat_type = NEW_FAT_TYPE;
     br.fat_copies = NEW_FAT_COPIES;
     br.cluster_size = NEW_CLUSTER_SIZE;
-    br.usable_cluster_count = NEW_USABLE_CLUSTER_COUNT;
+    br.usable_cluster_count = pow(2.0, NEW_FAT_TYPE) - NEW_FAT_COPIES - 2;
 
     //empty cluster
     char cluster_empty[br.cluster_size];

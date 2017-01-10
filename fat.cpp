@@ -605,12 +605,15 @@ int32_t fat::get_cluster_count(int32_t fat_start) {
     return count;
 }
 
+/**
+ * Function for defragmenting the loaded FAT file system
+ */
 void fat::defragment() {
     std::vector<new_records> new_rec = std::vector<new_records>();
     int32_t new_fat[fs_br->usable_cluster_count];
     new_records temp;
 
-    print_info();
+    std::cout << "DEFRAGMENTING FILE SYSTEM\n-------------------------" << std::endl;
 
     int32_t fat_pos = 1;
     for (int i = 0; i < dir_info.size(); i++) {
@@ -683,23 +686,31 @@ void fat::defragment() {
                 memset(cluster, '\0', sizeof(cluster));
                 strcpy(cluster, cluster_data.at(orig).c_str());
                 fseek(fs,
-                      (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) + (fs_br->cluster_size * i)),
+                      (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
+                       (fs_br->cluster_size * i)),
                       SEEK_SET);
                 fwrite(&cluster, sizeof(cluster), 1, fs);
             } else if (new_fat[i] == FAT_UNUSED) {
-                if (fat_table[i] != FAT_UNUSED) {
-                    char cluster_empty[fs_br->cluster_size];
-                    memset(cluster_empty, '\0', sizeof(cluster_empty));
-                    fseek(fs,
-                          (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) + (fs_br->cluster_size * i)),
-                          SEEK_SET);
-                    fwrite(&cluster_empty, sizeof(cluster_empty), 1, fs);
-                }
+                char cluster_empty[fs_br->cluster_size];
+                memset(cluster_empty, '\0', sizeof(cluster_empty));
+                fseek(fs,
+                      (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
+                       (fs_br->cluster_size * i)),
+                      SEEK_SET);
+                fwrite(&cluster_empty, sizeof(cluster_empty), 1, fs);
             }
         }
     }
+
+    std::cout << "------------------------\nFILE SYSTEM DEFRAGMENTED" << std::endl;
 }
 
+/**
+ * Function for getting the position of a cluster before defragmentation
+ * @param rec Vector of structures containing defragmented clusters
+ * @param actual_cluster Number of cluster after defragmentation
+ * @return Integer value of cluster number before the defragmentation
+ */
 int32_t fat::get_orig_cluster(std::vector<new_records> rec, int32_t actual_cluster) {
     for (int i = 0; i < rec.size(); i++) {
         if (rec.at(i).actual_cluster == actual_cluster) {
@@ -708,6 +719,12 @@ int32_t fat::get_orig_cluster(std::vector<new_records> rec, int32_t actual_clust
     }
 }
 
+/**
+ * Function for getting the position of a cluster after defragmentation
+ * @param rec Vector of structures containing defragmented clusters
+ * @param new_cluster Number of a cluster before defragmentation
+ * @return Integer value of cluster number after the defragmentation
+ */
 int32_t fat::get_new_cluster(std::vector<new_records> rec, int32_t new_cluster) {
     for (int i = 0; i < rec.size(); i++) {
         if (rec.at(i).orig_cluster == new_cluster) {
@@ -716,6 +733,11 @@ int32_t fat::get_new_cluster(std::vector<new_records> rec, int32_t new_cluster) 
     }
 }
 
+/**
+ * Function for getting all clusters that the file content is stored on
+ * @param cluster Starting cluster number
+ * @return A vector of clusters
+ */
 std::vector<int32_t> fat::get_file_clusters(int32_t cluster) {
     std::vector<int32_t> clusters = std::vector<int32_t>();
     if ((fat_table[cluster] == FAT_DIRECTORY) || (fat_table[cluster] == FAT_FILE_END)) {
@@ -731,12 +753,9 @@ std::vector<int32_t> fat::get_file_clusters(int32_t cluster) {
     return clusters;
 }
 
-//void fat::remove_from_overwritten(int32_t cluster, std::deque<new_records> overwritten){
-
-//}
-
 /**
- * Prints out FAT Boot record and FAT table content (does not print empty clusters)
+ * Prints out FAT Boot record and FAT table content (does not print empty clusters).
+ * Only for debugging purposes
  */
 void fat::print_info() {
     std::cout << "--------------------------------------------------------" << std::endl;
@@ -760,20 +779,20 @@ void fat::print_info() {
 }
 
 /**
- * Creating an empty new FAT
+ * Creating an empty new FAT, default FAT options can be edited in the header file
  * @param fp Pointer to a file stream, where the FAT will be stored
  */
 void fat::fat_creator(FILE *fp) {
     struct boot_record br;
     memset(br.volume_descriptor, '\0', sizeof(br.volume_descriptor));
     memset(br.signature, '\0', sizeof(br.signature));
-    char volume_descriptor[250] = "FAT - type: 8, copies: 2, cluster_size: 256, usable_cluster: 251";
+    char volume_descriptor[250] = "FAT description";
     strcpy(br.volume_descriptor, volume_descriptor);
-    strcpy(br.signature, "JS");
-    br.fat_type = 8;
-    br.fat_copies = 2;
-    br.cluster_size = 256;
-    br.usable_cluster_count = 251;
+    strcpy(br.signature, "A14B0448P");
+    br.fat_type = NEW_FAT_TYPE;
+    br.fat_copies = NEW_FAT_COPIES;
+    br.cluster_size = NEW_CLUSTER_SIZE;
+    br.usable_cluster_count = NEW_USABLE_CLUSTER_COUNT;
 
     //empty cluster
     char cluster_empty[br.cluster_size];

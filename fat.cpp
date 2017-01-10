@@ -98,7 +98,10 @@ void fat::create_new_file(std::string file_path, std::string fat_path) {
     // ---
     // Reading the input file and storing its content into a string vector
     // ---
-    fnew = fopen(file_path.c_str(), "r");
+    if((fnew = fopen(file_path.c_str(), "r")) == NULL){
+        std::cout << "FILE NOT FOUND" << std::endl;
+        exit(1);
+    }
     fseek(fnew, 0, SEEK_END);
     long fsize = ftell(fnew);
     fseek(fnew, 0, SEEK_SET);
@@ -121,13 +124,14 @@ void fat::create_new_file(std::string file_path, std::string fat_path) {
     // ---
     // Updating the parent directory content
     // ---
-    std::string name = file_path.substr(0, file_path.find_last_of(".")).substr(0,8);
-    std::string extension = file_path.substr(file_path.find_last_of(".") + 1).substr(0,3);
-    std::string file_name = name + "." + extension;
+    std::string file_name = file_path.substr(file_path.find_last_of("/") + 1);
+    std::string name = file_name.substr(0, file_name.find_last_of(".")).substr(0,8);
+    std::string extension = file_name.substr(file_name.find_last_of(".") + 1).substr(0,3);
+    std::string cropped_file_name = name + "." + extension;
 
     memset(root.name, '\0', sizeof(root.name));
     root.is_file = 1;
-    strcpy(root.name, file_name.c_str());
+    strcpy(root.name, cropped_file_name.c_str());
     root.size = fsize;
     root.start_cluster = free_clusters.at(0);
 
@@ -143,7 +147,7 @@ void fat::create_new_file(std::string file_path, std::string fat_path) {
         exit(1);
     }
     for(int i = 0; i < children.size(); i++){
-        if((strcmp(children.at(i).name, file_name.c_str()) == 0) && children.at(i).is_file){
+        if((strcmp(children.at(i).name, cropped_file_name.c_str()) == 0) && children.at(i).is_file){
             std::cout << "NAME ALREADY EXISTS" << std::endl;
             exit(1);
         }

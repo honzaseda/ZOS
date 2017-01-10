@@ -102,8 +102,6 @@ private:
 
     std::vector<int32_t> get_file_clusters(int32_t cluster);
 
-    //void remove_from_overwritten(int32_t cluster, std::deque<new_records> overwritten);
-
     int32_t get_orig_cluster(std::vector<new_records> rec, int32_t actual_cluster);
 
     int32_t get_new_cluster(std::vector<new_records> rec, int32_t new_cluster);

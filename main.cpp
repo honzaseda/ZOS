@@ -56,7 +56,7 @@ void resolve_arg(int argc, char *argv[]) {
             compare_args(action, argc, 3);
             fat1.defragment();
         } else {
-            std::cout << "ARGUMENT NOT RECOGNIZED" << std::endl;
+            std::cout << "CALLED ACTION NOT RECOGNIZED" << std::endl;
             exit(1);
         }
     }

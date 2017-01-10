@@ -121,9 +121,13 @@ void fat::create_new_file(std::string file_path, std::string fat_path) {
     // ---
     // Updating the parent directory content
     // ---
+    std::string name = file_path.substr(0, file_path.find_last_of(".")).substr(0,8);
+    std::string extension = file_path.substr(file_path.find_last_of(".") + 1).substr(0,3);
+    std::string file_name = name + "." + extension;
+
     memset(root.name, '\0', sizeof(root.name));
     root.is_file = 1;
-    strcpy(root.name, file_path.c_str());
+    strcpy(root.name, file_name.c_str());
     root.size = fsize;
     root.start_cluster = free_clusters.at(0);
 
@@ -133,6 +137,17 @@ void fat::create_new_file(std::string file_path, std::string fat_path) {
         exit(1);
     }
     std::vector<fat::directory> children = get_dir_children(parent);
+    long max_cluster_dirs = fs_br->cluster_size / sizeof(struct directory);
+    if(children.size() >= max_cluster_dirs){
+        std::cout << "DIRECTORY IS FULL" << std::endl;
+        exit(1);
+    }
+    for(int i = 0; i < children.size(); i++){
+        if((strcmp(children.at(i).name, file_name.c_str()) == 0) && children.at(i).is_file){
+            std::cout << "NAME ALREADY EXISTS" << std::endl;
+            exit(1);
+        }
+    }
     fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
                parent * fs_br->cluster_size), SEEK_SET);
     int16_t ac_size = 0;
@@ -258,7 +273,7 @@ void fat::create_new_directory(std::string dir_name, std::string fat_path) {
     // ---
     memset(root.name, '\0', sizeof(root.name));
     root.is_file = 0;
-    strcpy(root.name, dir_name.c_str());
+    strcpy(root.name, dir_name.substr(0,12).c_str());
     root.size = 0;
     root.start_cluster = cluster;
 
@@ -267,7 +282,18 @@ void fat::create_new_directory(std::string dir_name, std::string fat_path) {
         std::cout << "PATH NOT FOUND" << std::endl;
         exit(1);
     }
+    long max_cluster_dirs = fs_br->cluster_size / sizeof(struct directory);
     std::vector<fat::directory> children = get_dir_children(parent);
+    if(children.size() >= max_cluster_dirs){
+        std::cout << "DIRECTORY IS FULL" << std::endl;
+        exit(1);
+    }
+    for(int i = 0; i < children.size(); i++){
+        if((strcmp(children.at(i).name, dir_name.substr(0,12).c_str()) == 0) && !children.at(i).is_file){
+            std::cout << "NAME ALREADY EXISTS" << std::endl;
+            exit(1);
+        }
+    }
     fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
                parent * fs_br->cluster_size), SEEK_SET);
     int16_t ac_size = 0;
@@ -311,7 +337,10 @@ void fat::create_new_directory(std::string dir_name, std::string fat_path) {
  */
 void fat::delete_directory(std::string dir_path) {
     std::vector<std::string> result = explode(dir_path, '/');
-
+    if(result.size() == 0){
+        std::cout << "CANNOT DELETE ROOT" << std::endl;
+        exit(1);
+    }
     int32_t directory = get_parent_cluster(result);
     std::vector<fat::directory> dir_children = get_dir_children(directory);
     if (dir_children.size() > 0) {

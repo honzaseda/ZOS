@@ -1,5 +1,4 @@
 #include <iostream>
-#include <stdlib.h>
 #include "fat.h"
 
 using namespace std;

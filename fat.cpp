@@ -247,6 +247,7 @@ int32_t fat::get_parent_cluster(std::vector<std::string> file_path) {
                     } else {
                         if (last_parent.top() == dir_info.at(j).parent_dir && !dir_info.at(j).dir->is_file) {
                             last_parent.push(dir_info.at(j).dir->start_cluster);
+                            break;
                         }
                     }
                 }

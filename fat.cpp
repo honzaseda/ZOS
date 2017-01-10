@@ -490,6 +490,7 @@ void fat::print_file_clusters(std::string file_path) {
             std::cout << ", " << fat_table[curr_cluster];
             curr_cluster = fat_table[curr_cluster];
         }
+        std::cout << std::endl;
     } else {
         std::cout << "PATH NOT FOUND" << std::endl;
     }

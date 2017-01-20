@@ -503,7 +503,7 @@ void fat::print_file_clusters(std::string file_path) {
 void fat::get_cluster_content(int32_t cluster) {
     //pokud je prazdny (tedy zacina 0, tak nevypisuj obsah)
     if (fat_table[cluster] == FAT_FILE_END) {
-        std::cout << cluster_data.at(cluster) << std::endl;
+        std::cout << cluster_data.at(cluster);
     } else {
         std::cout << cluster_data.at(cluster);
         get_cluster_content(fat_table[cluster]);
@@ -518,7 +518,7 @@ void fat::get_file_content(std::string file_path) {
     std::vector<std::string> result = explode(file_path, '/');
     int32_t found_file = get_file_start(result);
     if (found_file != 0) {
-        std::cout << file_path << ": ";
+        //std::cout << file_path << ": ";
         get_cluster_content(found_file);
     } else {
         std::cout << "PATH NOT FOUND" << std::endl;
@@ -698,7 +698,24 @@ void fat::defragment() {
         fwrite(&new_fat, sizeof(new_fat), 1, fs);
     }
 
-    for (int i = 0; i < fs_br->usable_cluster_count; i++) {
+    int i = 0;
+    std::vector<fat::directory> dir_children = get_dir_children(0);
+    for (int j = 0; j < dir_children.size(); j++) {
+        dir_children.at(j).start_cluster = get_new_cluster(new_rec, dir_children.at(j).start_cluster);
+    }
+    int16_t ac_size = 0;
+    fseek(fs, (sizeof(boot_record) + (fs_br->fat_copies * sizeof(*fat_table) * fs_br->usable_cluster_count) +
+               i * fs_br->cluster_size), SEEK_SET);
+    for (int j = 0; j < dir_children.size(); j++) {
+        fwrite(&dir_children.at(j), sizeof(fat::directory), 1, fs);
+        ac_size += sizeof(fat::directory);
+    }
+    char buffer[] = {'\0'};
+    for (int16_t j = 0; j < (fs_br->cluster_size - ac_size); j++) {
+        fwrite(buffer, sizeof(buffer), 1, fs);
+    }
+
+    for (int i = 1; i < fs_br->usable_cluster_count; i++) {
         int32_t orig = get_orig_cluster(new_rec, i);
         if (new_fat[i] == FAT_DIRECTORY) {
             std::vector<fat::directory> dir_children = get_dir_children(orig);
